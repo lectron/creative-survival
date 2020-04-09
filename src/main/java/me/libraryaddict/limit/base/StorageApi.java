@@ -1,27 +1,30 @@
-package me.libraryaddict.Limit;
+package me.libraryaddict.limit.base;
 
-import java.io.File;
-import java.io.IOException;
-import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.util.HashMap;
-
+import me.libraryaddict.limit.Main;
+import me.libraryaddict.limit.utils.Location;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
+
+import java.io.File;
+import java.io.IOException;
+import java.sql.*;
+import java.util.HashMap;
 
 public class StorageApi {
 
     private static Connection connection;
     private static JavaPlugin mainPlugin;
-    private static HashMap<String, HashMap<Loc, String>> markedBlocks = new HashMap<String, HashMap<Loc, String>>();
+    private static HashMap<String, HashMap<Location, String>> markedBlocks = new HashMap<>();
     private static String mysqlDatabase, mysqlUsername, mysqlPassword, mysqlHost;
     private static boolean useMysql;
+
+    public StorageApi(Main plugin) {
+        mainPlugin = plugin;
+    }
 
     private static Connection connectMysql() {
         try {
@@ -29,7 +32,7 @@ public class StorageApi {
             String conn = "jdbc:mysql://" + mysqlHost + "/" + mysqlDatabase;
             return DriverManager.getConnection(conn, mysqlUsername, mysqlPassword);
         } catch (Exception ex) {
-            System.err.println("[LimitCreative] Unknown error while fetching MySQL connection. Is the mysql details correct? "
+            System.err.println("[LectronCreative] Unknown error while fetching MySQL connection. Is the mysql details correct? "
                     + ex.getMessage());
         }
         return null;
@@ -62,7 +65,7 @@ public class StorageApi {
 
     public static boolean isMarked(Block block) {
         return markedBlocks.containsKey(block.getWorld().getName())
-                && markedBlocks.get(block.getWorld().getName()).containsKey(new Loc(block));
+                && markedBlocks.get(block.getWorld().getName()).containsKey(new Location(block));
     }
 
     public static void loadBlocksFromFlatfile() {
@@ -80,7 +83,7 @@ public class StorageApi {
                                         markedBlocks.put(worldName, new HashMap());
                                     }
                                     markedBlocks.get(worldName).put(
-                                            new Loc(Integer.parseInt(x), Integer.parseInt(y), Integer.parseInt(z)),
+                                            new Location(Integer.parseInt(x), Integer.parseInt(y), Integer.parseInt(z)),
                                             config.getString(worldName + "." + x + "." + y + "." + z));
                                 }
                             }
@@ -103,9 +106,9 @@ public class StorageApi {
                     ResultSet rs = stmt.executeQuery();
                     while (rs.next()) {
                         if (!markedBlocks.containsKey(world.getName())) {
-                            markedBlocks.put(world.getName(), new HashMap<Loc, String>());
+                            markedBlocks.put(world.getName(), new HashMap<>());
                         }
-                        markedBlocks.get(world.getName()).put(new Loc(rs.getInt("x"), rs.getInt("y"), rs.getInt("z")),
+                        markedBlocks.get(world.getName()).put(new Location(rs.getInt("x"), rs.getInt("y"), rs.getInt("z")),
                                 rs.getString("lore"));
                     }
                 }
@@ -116,24 +119,25 @@ public class StorageApi {
     }
 
     public static void markBlock(Block block, String msg) {
-        markBlock(block.getWorld().getName(), new Loc(block), msg);
+        markBlock(block.getWorld().getName(), new Location(block), msg);
     }
 
-    public static void markBlock(final String world, final Loc loc, final String msg) {
+    public static void markBlock(final String world, final Location loc, final String msg) {
         if (!markedBlocks.containsKey(world)) {
-            markedBlocks.put(world, new HashMap<Loc, String>());
+            markedBlocks.put(world, new HashMap<>());
         }
         markedBlocks.get(world).put(loc, msg);
-        Bukkit.getScheduler().scheduleAsyncDelayedTask(mainPlugin, new Runnable() {
+        new BukkitRunnable() {
+            @Override
             public void run() {
                 if (useMysql) {
                     try {
                         PreparedStatement stmt = getConnection().prepareStatement(
                                 "INSERT INTO LimitCreative (`world`, `x`, `y`, `z`, `lore`) VALUES (?, ?, ?, ?, ?);");
                         stmt.setString(1, world);
-                        stmt.setInt(2, loc.x);
-                        stmt.setInt(3, loc.y);
-                        stmt.setInt(4, loc.z);
+                        stmt.setInt(2, loc.getX());
+                        stmt.setInt(3, loc.getY());
+                        stmt.setInt(4, loc.getZ());
                         stmt.setString(5, msg);
                         stmt.execute();
                     } catch (Exception ex) {
@@ -146,19 +150,19 @@ public class StorageApi {
                             file.createNewFile();
                         }
                         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
-                        config.set(world + "." + loc.x + "." + loc.y + "." + loc.z, msg);
+                        config.set(world + "." + loc.getX() + "." + loc.getY() + "." + loc.getZ(), msg);
                         config.save(file);
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
                 }
             }
-        });
+        }.runTaskAsynchronously(mainPlugin);
     }
 
     public static void saveBlocksToMysql() {
         for (String world : markedBlocks.keySet()) {
-            for (Loc loc : markedBlocks.get(world).keySet()) {
+            for (Location loc : markedBlocks.get(world).keySet()) {
                 markBlock(world, loc, markedBlocks.get(world).get(loc));
             }
         }
@@ -177,24 +181,25 @@ public class StorageApi {
     }
 
     public static String unmarkBlock(Block block) {
-        return unmarkBlock(block.getWorld().getName(), new Loc(block));
+        return unmarkBlock(block.getWorld().getName(), new Location(block));
     }
 
-    public static String unmarkBlock(final String world, final Loc loc) {
+    public static String unmarkBlock(final String world, final Location loc) {
         String msg = markedBlocks.get(world).remove(loc);
         if (markedBlocks.get(world).isEmpty()) {
             markedBlocks.remove(world);
         }
-        Bukkit.getScheduler().scheduleAsyncDelayedTask(mainPlugin, new Runnable() {
+        new BukkitRunnable() {
+            @Override
             public void run() {
                 if (useMysql) {
                     try {
                         PreparedStatement stmt = getConnection().prepareStatement(
                                 "DELETE FROM `LimitCreative` WHERE `world`=? AND `x`=? AND `y`=? AND `z`=?");
                         stmt.setString(1, world);
-                        stmt.setInt(2, loc.x);
-                        stmt.setInt(3, loc.y);
-                        stmt.setInt(4, loc.z);
+                        stmt.setInt(2, loc.getX());
+                        stmt.setInt(3, loc.getY());
+                        stmt.setInt(4, loc.getZ());
                         stmt.execute();
                     } catch (Exception ex) {
                         ex.printStackTrace();
@@ -203,7 +208,7 @@ public class StorageApi {
                     File file = new File(mainPlugin.getDataFolder(), "blocks.yml");
                     if (file.exists()) {
                         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
-                        String blockPath = world + "." + loc.x + "." + loc.y + "." + loc.z;
+                        String blockPath = world + "." + loc.getX() + "." + loc.getY() + "." + loc.getZ();
                         if (config.contains(blockPath)) {
                             config.set(blockPath, null);
                         }
@@ -215,7 +220,7 @@ public class StorageApi {
                     }
                 }
             }
-        });
+        }.runTaskAsynchronously(mainPlugin);
         return msg;
     }
 

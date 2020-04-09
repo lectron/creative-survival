@@ -1,24 +1,36 @@
-package me.libraryaddict.Limit;
+package me.libraryaddict.limit.utils;
 
 import org.bukkit.block.Block;
 
-public class Loc {
+public class Location {
     int x, y, z;
 
-    public Loc(Block block) {
+    public Location(Block block) {
         this(block.getX(), block.getY(), block.getZ());
     }
 
-    public Loc(int x, int y, int z) {
+    public Location(int x, int y, int z) {
         this.x = x;
         this.y = y;
         this.z = z;
     }
 
+    public int getX() {
+        return x;
+    }
+
+    public int getY() {
+        return y;
+    }
+
+    public int getZ() {
+        return z;
+    }
+
     @Override
     public boolean equals(Object obj) {
-        if (obj instanceof Loc) {
-            Loc loc = (Loc) obj;
+        if (obj instanceof Location) {
+            Location loc = (Location) obj;
             return loc.x == x && loc.y == y && loc.z == z;
         }
         return false;

@@ -1,0 +1,6 @@
+NoPermission: '&4You do not have permission to use this command!'
+NoCreativeMessageFound: '&4Didn''t find the creative message on the item!'
+RemovedCreativeMessage: '&4Removed the creative lore from the item!'
+NotHoldingItem: '&4You are not holding an item!'
+ItemUsageNotAllowed: '&4You are not allowed to use this item!'
+RemovedCreativeMessage: ''
