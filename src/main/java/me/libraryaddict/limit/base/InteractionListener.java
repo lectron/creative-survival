@@ -68,7 +68,7 @@ public class InteractionListener implements Listener {
 //                    disallowedItems.add(Material.getMaterial(Integer.parseInt(disallowed)));
 //                } catch (Exception e) {
 //                }
-                System.out.print("[LectronCreative] Cannot parse " + disallowed + " to a valid material");
+                System.out.print("[CreativeSurvival] Cannot parse " + disallowed + " to a valid material");
             }
         }
     }
@@ -86,21 +86,21 @@ public class InteractionListener implements Listener {
     }
 
     private String getCreativeString(ItemStack item) {
-        String who = NBTItemData.get("LectronCreative", "CreativeItem", item);
+        String who = NBTItemData.get("CreativeSurvival", "CreativeItem", item);
         return StringUtils.isNullOrEmpty(who) ? null : who;
     }
 
     private boolean isCreativeItem(ItemStack item) {
-        return NBTItemData.getList("LectronCreative", item).contains("CreativeItem");
+        return NBTItemData.getList("CreativeSurvival", item).contains("CreativeItem");
     }
 
     private String getSurvivalString(ItemStack item) {
-        String who = NBTItemData.get("LectronCreative", "SurvivalItem", item);
+        String who = NBTItemData.get("CreativeSurvival", "SurvivalItem", item);
         return StringUtils.isNullOrEmpty(who) ? null : who;
     }
 
     private boolean isSurvivalItem(ItemStack item) {
-        return NBTItemData.getList("LectronCreative", item).contains("SurvivalItem");
+        return NBTItemData.getList("CreativeSurvival", item).contains("SurvivalItem");
     }
 
     @EventHandler
@@ -176,9 +176,9 @@ public class InteractionListener implements Listener {
             for (int i = 0; i < items.length; i++) {
                 if (items[i] != null && items[i].getItemMeta() != null) {
                     if (creativeItem) {
-                        items[i] = NBTItemData.set("LectronCreative", "CreativeItem", NBTItemData.get("LectronCreative", "CreativeItem", event.getContents().getIngredient()), items[i]);
+                        items[i] = NBTItemData.set("CreativeSurvival", "CreativeItem", NBTItemData.get("CreativeSurvival", "CreativeItem", event.getContents().getIngredient()), items[i]);
                     } else {
-                        items[i] = NBTItemData.set("LectronCreative", "SurvivalItem", NBTItemData.get("LectronCreative", "SurvivalItem", event.getContents().getIngredient()), items[i]);
+                        items[i] = NBTItemData.set("CreativeSurvival", "SurvivalItem", NBTItemData.get("CreativeSurvival", "SurvivalItem", event.getContents().getIngredient()), items[i]);
                     }
                 }
             }
@@ -448,14 +448,14 @@ public class InteractionListener implements Listener {
 
     private ItemStack setCreativeItem(String who, ItemStack item) {
         if (item != null && item.getType() != Material.AIR) {
-            return NBTItemData.set("LectronCreative", "CreativeItem", who, item);
+            return NBTItemData.set("CreativeSurvival", "CreativeItem", who, item);
         }
         return item;
     }
 
     private ItemStack setSurvivalItem(String who, ItemStack item) {
         if (item != null && item.getType() != Material.AIR) {
-            return NBTItemData.set("LectronCreative", "SurvivalItem", who, item);
+            return NBTItemData.set("CreativeSurvival", "SurvivalItem", who, item);
         }
         return item;
     }

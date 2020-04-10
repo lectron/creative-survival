@@ -25,14 +25,14 @@ public class ClearCreativeCommand implements CommandExecutor {
             commandSender.sendMessage(ChatColor.RED + "Shove off console");
             return true;
         }
-        if (commandSender.hasPermission("lectroncreative.clearcreative")) {
+        if (commandSender.hasPermission("creativesurvival.clearcreative")) {
             ItemStack item = ((Player) commandSender).getItemInHand();
-            if (NBTItemData.getList("LectronCreative", item).contains("CreativeItem")) {
+            if (NBTItemData.getList("CreativeSurvival", item).contains("CreativeItem")) {
                 commandSender.sendMessage(Messages.get().getMessage("NoCreativeMessageFound"));
                 return false;
             }
             if (item.getType() != Material.AIR) {
-                ((Player) commandSender).setItemInHand(NBTItemData.remove("LectronCreative", "CreativeItem", item));
+                ((Player) commandSender).setItemInHand(NBTItemData.remove("CreativeSurvival", "CreativeItem", item));
                 commandSender.sendMessage(Messages.get().getMessage("RemovedCreativeMessage"));
             } else
                 commandSender.sendMessage(Messages.get().getMessage("NotHoldingItem"));
