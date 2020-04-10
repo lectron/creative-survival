@@ -21,6 +21,4 @@ While in creative, they can't do Blacklisted Commands (can be added or removed a
   - pvp
 
 # Commands and Permissions
-There is currently only one command and it is:
-/clearcreative - lectroncreative.clearcreative
-It removes the creative NBT data from the item that the command executor is holding.
+There is currently only one command and it is /clearcreative - lectroncreative.clearcreative which removes the creative NBT data from the item that the command executor is holding.
