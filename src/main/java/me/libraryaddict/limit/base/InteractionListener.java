@@ -2,6 +2,8 @@ package me.libraryaddict.limit.base;
 
 import com.google.common.base.Objects;
 import com.mysql.jdbc.StringUtils;
+import me.libraryaddict.limit.utils.Config;
+import me.libraryaddict.limit.utils.Location;
 import me.libraryaddict.limit.utils.Messages;
 import me.libraryaddict.limit.utils.Options;
 import me.libraryaddict.limit.utils.nbt.NBTItemData;
@@ -10,6 +12,7 @@ import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.Furnace;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.ItemFrame;
@@ -30,8 +33,8 @@ import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.*;
 
@@ -40,10 +43,21 @@ public class InteractionListener implements Listener {
     private final ArrayList<Material> disallowedItems = new ArrayList<>();
     private final List<String> disallowedWorlds;
     private final JavaPlugin plugin;
-    private final Map<Block, String> markedBlocks = new HashMap<>();
+    private final Map<Location, String> markedBlocks = new HashMap<>();
 
     public InteractionListener(JavaPlugin plugin) {
         this.plugin = plugin;
+        blocksConfig = new Config("plugins/" + plugin.getName(), "blocks.yml", plugin);
+        blocksConfig.create();
+        if (!blocksConfig.getConfig().contains("Blocks")) {
+            blocksConfig.getConfig().set("Blocks", new ArrayList<>());
+        } else {
+            blocksConfig.getConfig().getStringList("Blocks").forEach(s -> {
+                String[] str = s.split(" ");
+                markedBlocks.put(new Location(str[0], Integer.parseInt(str[1]), Integer.parseInt(str[2]), Integer.parseInt(str[3])), str[4]);
+            });
+        }
+
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
         disallowedWorlds = getConfig().getStringList("WorldsDisabled");
         for (String disallowed : getConfig().getStringList("DisabledItems")) {
@@ -122,7 +136,7 @@ public class InteractionListener implements Listener {
         }
         if (getConfig().getBoolean("MarkBlocks")
                 && (isCreativeItem(event.getItemInHand()) || event.getPlayer().getGameMode() == GameMode.CREATIVE)) {
-            markedBlocks.put(event.getBlockPlaced(), getCreativeString(event.getItemInHand()));
+            markBlock(event.getBlockPlaced(), getCreativeString(event.getItemInHand()));
         }
     }
 
@@ -137,9 +151,8 @@ public class InteractionListener implements Listener {
             event.setExpToDrop(0);
         }
 
-        if (markedBlocks.containsKey(event.getBlock())) {
-            final String message = markedBlocks.get(event.getBlock());
-            markedBlocks.remove(event.getBlock());
+        if (isMarked(event.getBlock())) {
+            String message = unmarkBlock(event.getBlock());
             if (event.getPlayer().getGameMode() != GameMode.CREATIVE) {
                 event.setExpToDrop(0);
                 Collection<ItemStack> drops = event.getBlock().getDrops(event.getPlayer().getItemInHand());
@@ -245,8 +258,8 @@ public class InteractionListener implements Listener {
             return;
         }
         for (Block block : event.blockList()) {
-            if (markedBlocks.containsKey(block)) {
-                String message = markedBlocks.remove(block);
+            if (isMarked(block)) {
+                String message = unmarkBlock(block);
                 block.getDrops().iterator().forEachRemaining(item -> {
                     item = setCreativeItem(message, item);
                     block.getWorld().dropItemNaturally(block.getLocation().clone().add(0.5, 0, 0.5), item);
@@ -313,6 +326,7 @@ public class InteractionListener implements Listener {
         }
     }
 
+
     @EventHandler(priority = EventPriority.MONITOR)
     public void onInventoryClick(InventoryClickEvent event) {
         if (disallowedWorlds.contains(event.getWhoClicked().getWorld().getName())) {
@@ -325,26 +339,15 @@ public class InteractionListener implements Listener {
             }
         }
         if (event.getWhoClicked().getGameMode() == GameMode.CREATIVE && event.getAction() == InventoryAction.CLONE_STACK
-                && !isCreativeItem(event.getCurrentItem()) && !isSurvivalItem(event.getCurrentItem())) {
+                && !isCreativeItem(event.getCurrentItem())) {
             ItemStack item = event.getCurrentItem();
             if (item != null && item.getType() != Material.AIR) {
-                item = setCreativeItem(event.getWhoClicked().getName(), event.getCurrentItem().clone());
+                if (!isSurvivalItem(item)) {
+                    item = setCreativeItem(event.getWhoClicked().getName(), event.getCurrentItem().clone());
+                }
                 item.setAmount(item.getMaxStackSize());
                 event.getWhoClicked().setItemOnCursor(item);
                 event.setCancelled(true);
-            }
-        }
-
-        if (!event.getWhoClicked().hasPermission("limitcreative.itemtransfer")) {
-            Inventory top = event.getView().getTopInventory();
-            Inventory bottom = event.getView().getBottomInventory();
-
-            if (!Objects.equal(top, bottom)) {
-                if (event.getCurrentItem() != null && event.getCurrentItem().getType() != Material.AIR) {
-                    if (isCreativeItem(event.getCurrentItem())) {
-                        event.setCancelled(true);
-                    }
-                }
             }
         }
     }
@@ -355,7 +358,7 @@ public class InteractionListener implements Listener {
             return;
         }
 
-        if (!event.getWhoClicked().hasPermission("limitcreative.itemtransfer")) {
+        if (getConfig().getBoolean("PreventTransfer")) {
             Inventory top = event.getView().getTopInventory();
             Inventory bottom = event.getView().getBottomInventory();
 
@@ -368,6 +371,7 @@ public class InteractionListener implements Listener {
             }
         }
     }
+
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerPickupItem(EntityPickupItemEvent event) {
@@ -403,7 +407,7 @@ public class InteractionListener implements Listener {
             return;
         }
         for (Block block : event.getBlocks()) {
-            if (markedBlocks.containsKey(block)) {
+            if (isMarked(block)) {
                 event.setCancelled(true);
                 return;
             }
@@ -417,7 +421,7 @@ public class InteractionListener implements Listener {
         }
         if (event.isSticky()) {
             Block block = event.getBlock().getRelative(event.getDirection()).getRelative(event.getDirection());
-            if (markedBlocks.containsKey(block)) {
+            if (isMarked(block)) {
                 event.setCancelled(true);
             }
         }
@@ -443,16 +447,72 @@ public class InteractionListener implements Listener {
     }
 
     private ItemStack setCreativeItem(String who, ItemStack item) {
-        if (item != null && item.getType() != Material.AIR && item.getType() != Material.LEGACY_BOOK_AND_QUILL) {
+        if (item != null && item.getType() != Material.AIR) {
             return NBTItemData.set("LectronCreative", "CreativeItem", who, item);
         }
         return item;
     }
 
     private ItemStack setSurvivalItem(String who, ItemStack item) {
-        if (item != null && item.getType() != Material.AIR && item.getType() != Material.LEGACY_BOOK_AND_QUILL) {
+        if (item != null && item.getType() != Material.AIR) {
             return NBTItemData.set("LectronCreative", "SurvivalItem", who, item);
         }
         return item;
     }
+
+    private final Config blocksConfig;
+
+    public boolean isMarked(Block block) {
+        for (Location loc : markedBlocks.keySet()) {
+            if (loc.equals(new Location(block))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public void markBlock(Block block, String msg) {
+        markBlock(new Location(block), msg);
+    }
+
+    public void markBlock(final Location loc, final String msg) {
+        markedBlocks.put(loc, msg);
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                List<String> b = blocksConfig.getConfig().getStringList("Blocks");
+                b.add(String.format("%s %s %s %s %s", loc.getWorld(), loc.getX(), loc.getY(), loc.getZ(), msg));
+                blocksConfig.getConfig().set("Blocks", b);
+                blocksConfig.saveConfig();
+                blocksConfig.reloadConfig();
+            }
+        }.runTaskAsynchronously(plugin);
+    }
+
+    public String unmarkBlock(Block block) {
+        return unmarkBlock(new Location(block));
+    }
+
+    public String unmarkBlock(final Location loc) {
+        String msg = markedBlocks.remove(loc);
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                List<String> b = blocksConfig.getConfig().getStringList("Blocks");
+                b.iterator().forEachRemaining(s -> {
+                    String[] str = s.split(" ");
+                    Location l = new Location(str[0], Integer.parseInt(str[1]), Integer.parseInt(str[2]), Integer.parseInt(str[3]));
+                    if (l.equals(loc)) {
+                        b.remove(s);
+                    }
+                });
+                blocksConfig.getConfig().set("Blocks", b);
+                blocksConfig.saveConfig();
+                blocksConfig.reloadConfig();
+            }
+        }.runTaskAsynchronously(plugin);
+        return msg;
+    }
+
+
 }

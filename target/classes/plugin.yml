@@ -2,9 +2,9 @@ name: LectronCreative
 main: me.libraryaddict.limit.Main
 authors:
   - libraryaddict
+  - Zenya4
   - Skyvko6607
-version: 1.7.3
-api-version: 1.15
+version: 2.0
+api-version: 1.13
 commands:
-  clearlore:
-  limitcreativeconvert:
+  clearcreative:

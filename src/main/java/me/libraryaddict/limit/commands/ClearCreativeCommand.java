@@ -11,11 +11,11 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
-public class ClearLoreCommand implements CommandExecutor {
+public class ClearCreativeCommand implements CommandExecutor {
 
     private Main plugin;
 
-    public ClearLoreCommand(Main plugin) {
+    public ClearCreativeCommand(Main plugin) {
         this.plugin = plugin;
     }
 
@@ -25,7 +25,7 @@ public class ClearLoreCommand implements CommandExecutor {
             commandSender.sendMessage(ChatColor.RED + "Shove off console");
             return true;
         }
-        if (commandSender.hasPermission("limitcreative.clearlore")) {
+        if (commandSender.hasPermission("limitcreative.clearcreative")) {
             ItemStack item = ((Player) commandSender).getItemInHand();
             if (NBTItemData.getList("LectronCreative", item).contains("CreativeItem")) {
                 commandSender.sendMessage(Messages.get().getMessage("NoCreativeMessageFound"));
