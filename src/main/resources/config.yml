@@ -22,6 +22,8 @@ PreventAnvil: true
 PreventArmor: true
 # Mark blocks which are creative spawned in to drop creative spawned items.
 MarkBlocks: true
+# Does it prevent creative items being transefered into another inventory?
+PreventTransfer: true
 # Does it prevent creative items being dropped?
 PreventDrop: false
 

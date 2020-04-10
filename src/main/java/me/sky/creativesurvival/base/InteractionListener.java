@@ -1,22 +1,18 @@
 package me.sky.creativesurvival.base;
 
-import com.google.common.base.Objects;
 import com.mysql.jdbc.StringUtils;
 import me.sky.creativesurvival.utils.Config;
 import me.sky.creativesurvival.utils.Location;
 import me.sky.creativesurvival.utils.Messages;
 import me.sky.creativesurvival.utils.Options;
 import me.sky.creativesurvival.utils.nbt.NBTItemData;
+import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.Furnace;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.HumanEntity;
-import org.bukkit.entity.ItemFrame;
-import org.bukkit.entity.Player;
+import org.bukkit.entity.*;
 import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -26,12 +22,12 @@ import org.bukkit.event.block.BlockPistonExtendEvent;
 import org.bukkit.event.block.BlockPistonRetractEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.enchantment.PrepareItemEnchantEvent;
-import org.bukkit.event.entity.*;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.inventory.*;
-import org.bukkit.event.player.PlayerCommandPreprocessEvent;
-import org.bukkit.event.player.PlayerGameModeChangeEvent;
-import org.bukkit.event.player.PlayerInteractEntityEvent;
-import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.*;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -86,11 +82,6 @@ public class InteractionListener implements Listener {
         return Options.get().getConfig().getConfig();
     }
 
-    private String getCreativeString(ItemStack item) {
-        String who = NBTItemData.get("CreativeSurvival", "CreativeItem", item);
-        return StringUtils.isNullOrEmpty(who) ? null : who;
-    }
-
     private boolean isCreativeItem(ItemStack item) {
         return NBTItemData.getList("CreativeSurvival", item).contains("CreativeItem");
     }
@@ -107,7 +98,7 @@ public class InteractionListener implements Listener {
     @EventHandler
     public void commandExecute(PlayerCommandPreprocessEvent event) {
         Player player = event.getPlayer();
-        if (player.getGameMode() == GameMode.CREATIVE && getConfig().getStringList("BlacklistedCommands").contains(event.getMessage())) {
+        if (player.getGameMode() == GameMode.CREATIVE) {
             for (String s : getConfig().getStringList("BlacklistedCommands")) {
                 if (event.getMessage().replace("/", "").startsWith(s)) {
                     event.setCancelled(true);
@@ -142,7 +133,7 @@ public class InteractionListener implements Listener {
         }
         if (getConfig().getBoolean("MarkBlocks")
                 && (isCreativeItem(event.getItemInHand()) || event.getPlayer().getGameMode() == GameMode.CREATIVE)) {
-            markBlock(event.getBlockPlaced(), getCreativeString(event.getItemInHand()));
+            markBlock(event.getBlockPlaced(), event.getPlayer().getName());
         }
     }
 
@@ -157,18 +148,24 @@ public class InteractionListener implements Listener {
             event.setExpToDrop(0);
         }
 
-        if (isMarked(event.getBlock())) {
-            String message = unmarkBlock(event.getBlock());
-            if (event.getPlayer().getGameMode() != GameMode.CREATIVE) {
-                event.setExpToDrop(0);
-                Collection<ItemStack> drops = event.getBlock().getDrops(event.getPlayer().getItemInHand());
-                drops.iterator().forEachRemaining(item -> {
-                    item = setCreativeItem(message, item);
-                    event.getBlock().getWorld().dropItemNaturally(event.getBlock().getLocation().clone().add(0.5, 0, 0.5), item);
-                });
-                event.getBlock().setType(Material.AIR);
-            }
+        String message = isMarked(event.getBlock()) ? unmarkBlock(event.getBlock()) : null;
+        if (event.getPlayer().getGameMode() == GameMode.CREATIVE) {
+            return;
         }
+
+        event.setExpToDrop(0);
+        Collection<ItemStack> drops = event.getBlock().getDrops(event.getPlayer().getItemInHand());
+        drops.iterator().forEachRemaining(item -> {
+            if (message != null) {
+                item = setCreativeItem(message, item);
+            } else if (event.getPlayer().getGameMode() == GameMode.CREATIVE) {
+                item = setCreativeItem(event.getPlayer().getName(), item);
+            } else {
+                item = setSurvivalItem(event.getPlayer().getName(), item);
+            }
+            event.getBlock().getWorld().dropItemNaturally(event.getBlock().getLocation().clone(), item);
+        });
+        event.getBlock().setType(Material.AIR);
     }
 
     @EventHandler
@@ -214,16 +211,16 @@ public class InteractionListener implements Listener {
         if (disallowedWorlds.contains(event.getWhoClicked().getWorld().getName())) {
             return;
         }
-        if (!isSurvivalItem(event.getCursor())) {
-            event.setCursor(setCreativeItem(event.getWhoClicked().getName(), event.getCursor()));
-        }
         if (disallowedItems.contains(event.getCursor().getType())) {
-            if (!event.getWhoClicked().hasPermission("limitcreative.useblacklistitems")) {
+            if (!event.getWhoClicked().hasPermission("creativesurvival.useblacklistitems")) {
                 event.setCancelled(true);
                 if (event.getWhoClicked() instanceof Player) {
                     event.getWhoClicked().sendMessage(Messages.get().getMessage("ItemUsageNotAllowed"));
                 }
             }
+        } else {
+//        } else if (event.getClickedInventory() == null || !event.getClickedInventory().equals(event.getWhoClicked().getInventory())) {
+            event.setCursor(setCreativeItem(event.getWhoClicked().getName(), event.getCursor()));
         }
     }
 
@@ -268,7 +265,7 @@ public class InteractionListener implements Listener {
                 String message = unmarkBlock(block);
                 block.getDrops().iterator().forEachRemaining(item -> {
                     item = setCreativeItem(message, item);
-                    block.getWorld().dropItemNaturally(block.getLocation().clone().add(0.5, 0, 0.5), item);
+                    block.getWorld().dropItemNaturally(block.getLocation().clone(), item);
                 });
                 block.setType(Material.AIR);
             }
@@ -384,20 +381,21 @@ public class InteractionListener implements Listener {
             return;
         }
 
-        if (getConfig().getBoolean("PreventTransfer")) {
+        if (getConfig().getBoolean("PreventTransfer") && event.getWhoClicked().getGameMode() == GameMode.CREATIVE) {
             Inventory top = event.getView().getTopInventory();
             Inventory bottom = event.getView().getBottomInventory();
 
-            if (top != null && bottom != null && !top.equals(bottom)) {
+            if (top != null && bottom != null && !top.equals(bottom) && !top.getType().equals(InventoryType.CREATIVE) && !top.getType().equals(InventoryType.CRAFTING)) {
                 ItemStack item = event.getCurrentItem();
                 if (item != null && item.getType() != Material.AIR) {
+                    event.setCancelled(true);
                     event.setResult(Event.Result.DENY);
                 }
             }
         }
     }
 
-    @EventHandler(priority = EventPriority.MONITOR)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPlayerPickupItem(EntityPickupItemEvent event) {
         if (!(event.getEntity() instanceof Player)) {
             return;
@@ -406,23 +404,36 @@ public class InteractionListener implements Listener {
         if (disallowedWorlds.contains(player.getWorld().getName())) {
             return;
         }
-        if (!player.hasPermission("limitcreative.pickupcreativeitem")) {
+        if (!player.hasPermission("creativesurvival.pickupcreativeitem")) {
             if (player.getGameMode() != GameMode.CREATIVE && isCreativeItem(event.getItem().getItemStack())) {
                 event.setCancelled(true);
+                return;
             }
         }
-        if (!player.hasPermission("limitcreative.pickupsurvivalitem")) {
+        if (!player.hasPermission("creativesurvival.pickupsurvivalitem")) {
             if (player.getGameMode() == GameMode.CREATIVE && !isCreativeItem(event.getItem().getItemStack())) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+        if (!event.isCancelled() && !isSurvivalItem(event.getItem().getItemStack()) && !isCreativeItem(event.getItem().getItemStack())) {
+            if (player.getGameMode() == GameMode.CREATIVE ||
+                    player.getGameMode() == GameMode.SURVIVAL) {
+                addPickupItem(player, event.getItem());
+                event.getItem().remove();
                 event.setCancelled(true);
             }
         }
-        if (!event.isCancelled()) {
-            if (player.getGameMode() == GameMode.CREATIVE) {
-                event.getItem().setItemStack(setCreativeItem(player.getName(), event.getItem().getItemStack()));
-            } else if (player.getGameMode() == GameMode.SURVIVAL) {
-                event.getItem().setItemStack(setSurvivalItem(player.getName(), event.getItem().getItemStack()));
-            }
+    }
+
+    private void addPickupItem(Player player, Item item) {
+        ItemStack itemStack = item.getItemStack().clone();
+        if (player.getGameMode() == GameMode.CREATIVE) {
+            itemStack = setCreativeItem(player.getName(), itemStack);
+        } else if (player.getGameMode() == GameMode.SURVIVAL) {
+            itemStack = setSurvivalItem(player.getName(), itemStack);
         }
+        player.getInventory().addItem(itemStack);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -452,12 +463,9 @@ public class InteractionListener implements Listener {
     }
 
     @EventHandler
-    public void itemDrop(EntityDropItemEvent event) {
-        if (!(event.getEntity() instanceof Player)) {
-            return;
-        }
-        Player player = (Player) event.getEntity();
-        if (isCreativeItem(event.getItemDrop().getItemStack())) {
+    public void itemDrop(PlayerDropItemEvent event) {
+        Player player = event.getPlayer();
+        if (player.getGameMode() == GameMode.CREATIVE && isCreativeItem(event.getItemDrop().getItemStack())) {
             event.setCancelled(true);
         }
     }
@@ -523,13 +531,17 @@ public class InteractionListener implements Listener {
             @Override
             public void run() {
                 List<String> b = blocksConfig.getConfig().getStringList("Blocks");
-                b.iterator().forEachRemaining(s -> {
-                    String[] str = s.split(" ");
-                    Location l = new Location(str[0], Integer.parseInt(str[1]), Integer.parseInt(str[2]), Integer.parseInt(str[3]));
-                    if (l.equals(loc)) {
-                        b.remove(s);
-                    }
-                });
+                if (b.size() > 0) {
+                    List<String> remove = new ArrayList<>();
+                    b.iterator().forEachRemaining(s -> {
+                        String[] str = s.split(" ");
+                        Location l = new Location(str[0], Integer.parseInt(str[1]), Integer.parseInt(str[2]), Integer.parseInt(str[3]));
+                        if (l.equals(loc)) {
+                            remove.add(s);
+                        }
+                    });
+                    b.removeAll(remove);
+                }
                 blocksConfig.getConfig().set("Blocks", b);
                 blocksConfig.saveConfig();
                 blocksConfig.reloadConfig();
