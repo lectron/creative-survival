@@ -1,4 +1,4 @@
-package me.libraryaddict.limit.utils;
+package me.sky.creativesurvival.utils;
 
 import com.google.common.base.Charsets;
 import com.google.common.io.ByteStreams;

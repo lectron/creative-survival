@@ -1,4 +1,4 @@
-package me.libraryaddict.limit.utils;
+package me.sky.creativesurvival.utils;
 
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;

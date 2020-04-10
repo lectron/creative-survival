@@ -1,12 +1,12 @@
-package me.libraryaddict.limit.base;
+package me.sky.creativesurvival.base;
 
 import com.google.common.base.Objects;
 import com.mysql.jdbc.StringUtils;
-import me.libraryaddict.limit.utils.Config;
-import me.libraryaddict.limit.utils.Location;
-import me.libraryaddict.limit.utils.Messages;
-import me.libraryaddict.limit.utils.Options;
-import me.libraryaddict.limit.utils.nbt.NBTItemData;
+import me.sky.creativesurvival.utils.Config;
+import me.sky.creativesurvival.utils.Location;
+import me.sky.creativesurvival.utils.Messages;
+import me.sky.creativesurvival.utils.Options;
+import me.sky.creativesurvival.utils.nbt.NBTItemData;
 import org.bukkit.GameMode;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -17,6 +17,7 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.ItemFrame;
 import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -107,8 +108,13 @@ public class InteractionListener implements Listener {
     public void commandExecute(PlayerCommandPreprocessEvent event) {
         Player player = event.getPlayer();
         if (player.getGameMode() == GameMode.CREATIVE && getConfig().getStringList("BlacklistedCommands").contains(event.getMessage())) {
-            event.setCancelled(true);
-            player.sendMessage(Messages.get().getMessage("CommandNotAllowedInCreative"));
+            for (String s : getConfig().getStringList("BlacklistedCommands")) {
+                if (event.getMessage().replace("/", "").startsWith(s)) {
+                    event.setCancelled(true);
+                    player.sendMessage(Messages.get().getMessage("CommandNotAllowedInCreative"));
+                    return;
+                }
+            }
         }
     }
 
@@ -362,7 +368,7 @@ public class InteractionListener implements Listener {
             Inventory top = event.getView().getTopInventory();
             Inventory bottom = event.getView().getBottomInventory();
 
-            if (!Objects.equal(top, bottom)) {
+            if (top != null && bottom != null && !top.equals(bottom)) {
                 if (event.getOldCursor() != null && event.getOldCursor().getType() != Material.AIR) {
                     if (isCreativeItem(event.getOldCursor())) {
                         event.setCancelled(true);
@@ -372,6 +378,24 @@ public class InteractionListener implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onInventoryDragEvent(InventoryClickEvent event) {
+        if (disallowedWorlds.contains(event.getWhoClicked().getWorld().getName())) {
+            return;
+        }
+
+        if (getConfig().getBoolean("PreventTransfer")) {
+            Inventory top = event.getView().getTopInventory();
+            Inventory bottom = event.getView().getBottomInventory();
+
+            if (top != null && bottom != null && !top.equals(bottom)) {
+                ItemStack item = event.getCurrentItem();
+                if (item != null && item.getType() != Material.AIR) {
+                    event.setResult(Event.Result.DENY);
+                }
+            }
+        }
+    }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerPickupItem(EntityPickupItemEvent event) {

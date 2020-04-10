@@ -1,8 +1,8 @@
-package me.libraryaddict.limit.commands;
+package me.sky.creativesurvival.commands;
 
-import me.libraryaddict.limit.Main;
-import me.libraryaddict.limit.utils.Messages;
-import me.libraryaddict.limit.utils.nbt.NBTItemData;
+import me.sky.creativesurvival.Main;
+import me.sky.creativesurvival.utils.Messages;
+import me.sky.creativesurvival.utils.nbt.NBTItemData;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.command.Command;
@@ -27,15 +27,16 @@ public class ClearCreativeCommand implements CommandExecutor {
         }
         if (commandSender.hasPermission("creativesurvival.clearcreative")) {
             ItemStack item = ((Player) commandSender).getItemInHand();
-            if (NBTItemData.getList("CreativeSurvival", item).contains("CreativeItem")) {
+            if (item.getType() == Material.AIR) {
+                commandSender.sendMessage(Messages.get().getMessage("NotHoldingItem"));
+                return false;
+            }
+            if (!NBTItemData.getList("CreativeSurvival", item).contains("CreativeItem")) {
                 commandSender.sendMessage(Messages.get().getMessage("NoCreativeMessageFound"));
                 return false;
             }
-            if (item.getType() != Material.AIR) {
-                ((Player) commandSender).setItemInHand(NBTItemData.remove("CreativeSurvival", "CreativeItem", item));
-                commandSender.sendMessage(Messages.get().getMessage("RemovedCreativeMessage"));
-            } else
-                commandSender.sendMessage(Messages.get().getMessage("NotHoldingItem"));
+            ((Player) commandSender).setItemInHand(NBTItemData.remove("CreativeSurvival", "CreativeItem", item));
+            commandSender.sendMessage(Messages.get().getMessage("RemovedCreativeMessage"));
         } else
             commandSender.sendMessage(Messages.get().getMessage("NoPermission"));
         return false;

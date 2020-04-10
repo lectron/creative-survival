@@ -1,15 +1,15 @@
-package me.libraryaddict.limit.utils.nbt.item_1_15;
+package me.sky.creativesurvival.utils.nbt.item_1_14;
 
-import net.minecraft.server.v1_15_R1.NBTTagCompound;
-import org.bukkit.craftbukkit.v1_15_R1.inventory.CraftItemStack;
+import net.minecraft.server.v1_14_R1.NBTTagCompound;
+import org.bukkit.craftbukkit.v1_14_R1.inventory.CraftItemStack;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.Set;
 
-public class NBTItemData_1_15 {
+public class NBTItemData_1_14 {
 
     public static ItemStack set(String base, String path, String i, ItemStack itemStack) {
-        net.minecraft.server.v1_15_R1.ItemStack item = CraftItemStack.asNMSCopy(itemStack);
+        net.minecraft.server.v1_14_R1.ItemStack item = CraftItemStack.asNMSCopy(itemStack);
         if (!item.hasTag()) {
             item.setTag(new NBTTagCompound());
         }
@@ -24,11 +24,11 @@ public class NBTItemData_1_15 {
     }
 
     public static ItemStack remove(String base, String path, ItemStack itemStack) {
-        net.minecraft.server.v1_15_R1.ItemStack item = CraftItemStack.asNMSCopy(itemStack);
+        net.minecraft.server.v1_14_R1.ItemStack item = CraftItemStack.asNMSCopy(itemStack);
         if (item.hasTag()) {
-            net.minecraft.server.v1_15_R1.NBTTagCompound tag = item.getTag();
+            net.minecraft.server.v1_14_R1.NBTTagCompound tag = item.getTag();
             if (tag.hasKey(base)) {
-                net.minecraft.server.v1_15_R1.NBTTagCompound info = tag.getCompound(base);
+                net.minecraft.server.v1_14_R1.NBTTagCompound info = tag.getCompound(base);
                 info.remove(path);
                 item.setTag(tag);
             }
@@ -37,7 +37,7 @@ public class NBTItemData_1_15 {
     }
 
     public static String get(String base, String path, ItemStack itemStack) {
-        net.minecraft.server.v1_15_R1.ItemStack item = CraftItemStack.asNMSCopy(itemStack);
+        net.minecraft.server.v1_14_R1.ItemStack item = CraftItemStack.asNMSCopy(itemStack);
         if (!item.hasTag()) {
             item.setTag(new NBTTagCompound());
         }
@@ -50,7 +50,7 @@ public class NBTItemData_1_15 {
     }
 
     public static Set<String> getList(String base, ItemStack itemStack) {
-        net.minecraft.server.v1_15_R1.ItemStack item = CraftItemStack.asNMSCopy(itemStack);
+        net.minecraft.server.v1_14_R1.ItemStack item = CraftItemStack.asNMSCopy(itemStack);
         if (!item.hasTag()) {
             item.setTag(new NBTTagCompound());
         }
@@ -63,7 +63,7 @@ public class NBTItemData_1_15 {
     }
 
     public static boolean isDefault(String base, ItemStack itemStack) {
-        net.minecraft.server.v1_15_R1.ItemStack item = CraftItemStack.asNMSCopy(itemStack);
+        net.minecraft.server.v1_14_R1.ItemStack item = CraftItemStack.asNMSCopy(itemStack);
         if (!item.hasTag()) {
             return true;
         }

@@ -1,9 +1,9 @@
-package me.libraryaddict.limit;
+package me.sky.creativesurvival;
 
-import me.libraryaddict.limit.base.InteractionListener;
-import me.libraryaddict.limit.commands.ClearCreativeCommand;
-import me.libraryaddict.limit.utils.Messages;
-import me.libraryaddict.limit.utils.Options;
+import me.sky.creativesurvival.base.InteractionListener;
+import me.sky.creativesurvival.commands.ClearCreativeCommand;
+import me.sky.creativesurvival.utils.Messages;
+import me.sky.creativesurvival.utils.Options;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class Main extends JavaPlugin {
