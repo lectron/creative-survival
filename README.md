@@ -1,2 +1,2 @@
-# lectron-creative
-Lectron Creative plugin for Minecraft server - fork of LimitCreative Reloaded
+# creative-survival
+A Minecraft server plugin that balance Creative mode in a Survival Multiplayer Serverfor - fork of LimitCreative Reloaded
