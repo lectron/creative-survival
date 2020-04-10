@@ -2,6 +2,7 @@ package me.libraryaddict.limit.commands;
 
 import me.libraryaddict.limit.Main;
 import me.libraryaddict.limit.utils.Messages;
+import me.libraryaddict.limit.utils.nbt.NBTItemData;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.command.Command;
@@ -9,11 +10,6 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
-
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
 
 public class ClearLoreCommand implements CommandExecutor {
 
@@ -30,29 +26,14 @@ public class ClearLoreCommand implements CommandExecutor {
             return true;
         }
         if (commandSender.hasPermission("limitcreative.clearlore")) {
-            String creativeMessage = ChatColor.translateAlternateColorCodes('&', plugin.getConfig().getString("ItemMessage"))
-                    .replace("%Name%", "");
             ItemStack item = ((Player) commandSender).getItemInHand();
+            if (NBTItemData.getList("LectronCreative", item).contains("CreativeItem")) {
+                commandSender.sendMessage(Messages.get().getMessage("NoCreativeMessageFound"));
+                return false;
+            }
             if (item.getType() != Material.AIR) {
-                boolean removed = false;
-                if (item.hasItemMeta() && item.getItemMeta().hasLore()) {
-                    ItemMeta meta = item.getItemMeta();
-                    Iterator<String> itel = meta.getLore().iterator();
-                    List<String> lore = new ArrayList<>();
-                    while (itel.hasNext()) {
-                        String s = itel.next();
-                        if (s.startsWith(creativeMessage)) {
-                            removed = true;
-                        } else
-                            lore.add(s);
-                    }
-                    meta.setLore(lore);
-                    item.setItemMeta(meta);
-                }
-                if (!removed)
-                    commandSender.sendMessage(Messages.get().getMessage("NoCreativeMessageFound"));
-                else
-                    commandSender.sendMessage(Messages.get().getMessage("RemovedCreativeMessage"));
+                ((Player) commandSender).setItemInHand(NBTItemData.remove("LectronCreative", "CreativeItem", item));
+                commandSender.sendMessage(Messages.get().getMessage("RemovedCreativeMessage"));
             } else
                 commandSender.sendMessage(Messages.get().getMessage("NotHoldingItem"));
         } else

@@ -1,9 +1,10 @@
 package me.libraryaddict.limit.base;
 
 import com.google.common.base.Objects;
-import me.libraryaddict.limit.base.StorageApi;
+import com.mysql.jdbc.StringUtils;
 import me.libraryaddict.limit.utils.Messages;
-import org.bukkit.ChatColor;
+import me.libraryaddict.limit.utils.Options;
+import me.libraryaddict.limit.utils.nbt.NBTItemData;
 import org.bukkit.GameMode;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -21,11 +22,9 @@ import org.bukkit.event.block.BlockPistonExtendEvent;
 import org.bukkit.event.block.BlockPistonRetractEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.enchantment.PrepareItemEnchantEvent;
-import org.bukkit.event.entity.EntityDamageByEntityEvent;
-import org.bukkit.event.entity.EntityDamageEvent;
-import org.bukkit.event.entity.EntityExplodeEvent;
-import org.bukkit.event.entity.EntityPickupItemEvent;
+import org.bukkit.event.entity.*;
 import org.bukkit.event.inventory.*;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerGameModeChangeEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -34,21 +33,18 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 public class InteractionListener implements Listener {
-    private final String creativeMessage;
-    private final ArrayList<Material> disallowedItems = new ArrayList<Material>();
+
+    private final ArrayList<Material> disallowedItems = new ArrayList<>();
     private final List<String> disallowedWorlds;
     private final JavaPlugin plugin;
+    private final Map<Block, String> markedBlocks = new HashMap<>();
 
     public InteractionListener(JavaPlugin plugin) {
         this.plugin = plugin;
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
-        creativeMessage = ChatColor.translateAlternateColorCodes('&', getConfig().getString("ItemMessage"));
         disallowedWorlds = getConfig().getStringList("WorldsDisabled");
         for (String disallowed : getConfig().getStringList("DisabledItems")) {
             try {
@@ -72,35 +68,34 @@ public class InteractionListener implements Listener {
     }
 
     private FileConfiguration getConfig() {
-        return plugin.getConfig();
+        return Options.get().getConfig().getConfig();
     }
 
     private String getCreativeString(ItemStack item) {
-        if (item != null && item.hasItemMeta()) {
-            ItemMeta meta = item.getItemMeta();
-            if (meta.hasLore()) {
-                for (String s : meta.getLore()) {
-                    if (s.startsWith(creativeMessage.replace("%Name%", ""))) {
-                        return s;
-                    }
-                }
-            }
-        }
-        return null;
+        String who = NBTItemData.get("LectronCreative", "CreativeItem", item);
+        return StringUtils.isNullOrEmpty(who) ? null : who;
     }
 
     private boolean isCreativeItem(ItemStack item) {
-        if (item != null && item.hasItemMeta()) {
-            ItemMeta meta = item.getItemMeta();
-            if (meta.hasLore()) {
-                for (String s : meta.getLore()) {
-                    if (s.startsWith(creativeMessage.replace("%Name%", ""))) {
-                        return true;
-                    }
-                }
-            }
+        return NBTItemData.getList("LectronCreative", item).contains("CreativeItem");
+    }
+
+    private String getSurvivalString(ItemStack item) {
+        String who = NBTItemData.get("LectronCreative", "SurvivalItem", item);
+        return StringUtils.isNullOrEmpty(who) ? null : who;
+    }
+
+    private boolean isSurvivalItem(ItemStack item) {
+        return NBTItemData.getList("LectronCreative", item).contains("SurvivalItem");
+    }
+
+    @EventHandler
+    public void commandExecute(PlayerCommandPreprocessEvent event) {
+        Player player = event.getPlayer();
+        if (player.getGameMode() == GameMode.CREATIVE && getConfig().getStringList("BlacklistedCommands").contains(event.getMessage())) {
+            event.setCancelled(true);
+            player.sendMessage(Messages.get().getMessage("CommandNotAllowedInCreative"));
         }
-        return false;
     }
 
     @EventHandler
@@ -110,6 +105,13 @@ public class InteractionListener implements Listener {
         }
         if (checkEntity(event.getDamager())) {
             event.setCancelled(true);
+            return;
+        }
+        if (event.getEntity() instanceof Player && event.getDamager() instanceof Player) {
+            Player target = (Player) event.getDamager();
+            if (target.getGameMode() == GameMode.CREATIVE && ((Player) event.getEntity()).getGameMode() != GameMode.CREATIVE) {
+                event.setCancelled(true);
+            }
         }
     }
 
@@ -120,7 +122,7 @@ public class InteractionListener implements Listener {
         }
         if (getConfig().getBoolean("MarkBlocks")
                 && (isCreativeItem(event.getItemInHand()) || event.getPlayer().getGameMode() == GameMode.CREATIVE)) {
-            StorageApi.markBlock(event.getBlockPlaced(), getCreativeString(event.getItemInHand()));
+            markedBlocks.put(event.getBlockPlaced(), getCreativeString(event.getItemInHand()));
         }
     }
 
@@ -135,15 +137,16 @@ public class InteractionListener implements Listener {
             event.setExpToDrop(0);
         }
 
-        if (StorageApi.isMarked(event.getBlock())) {
-            String message = StorageApi.unmarkBlock(event.getBlock());
+        if (markedBlocks.containsKey(event.getBlock())) {
+            final String message = markedBlocks.get(event.getBlock());
+            markedBlocks.remove(event.getBlock());
             if (event.getPlayer().getGameMode() != GameMode.CREATIVE) {
                 event.setExpToDrop(0);
                 Collection<ItemStack> drops = event.getBlock().getDrops(event.getPlayer().getItemInHand());
-                for (ItemStack item : drops) {
-                    setItemMetaData(message, item);
+                drops.iterator().forEachRemaining(item -> {
+                    item = setCreativeItem(message, item);
                     event.getBlock().getWorld().dropItemNaturally(event.getBlock().getLocation().clone().add(0.5, 0, 0.5), item);
-                }
+                });
                 event.getBlock().setType(Material.AIR);
             }
         }
@@ -154,14 +157,16 @@ public class InteractionListener implements Listener {
         if (disallowedWorlds.contains(event.getBlock().getWorld().getName())) {
             return;
         }
-        if (isCreativeItem(event.getContents().getIngredient())) {
-            List<String> lore = event.getContents().getIngredient().getItemMeta().getLore();
+        boolean survivalItem = isCreativeItem(event.getContents().getIngredient()), creativeItem = isCreativeItem(event.getContents().getIngredient());
+        if (creativeItem || survivalItem) {
             ItemStack[] items = event.getContents().getContents();
             for (int i = 0; i < items.length; i++) {
                 if (items[i] != null && items[i].getItemMeta() != null) {
-                    ItemMeta meta = items[i].getItemMeta();
-                    meta.setLore(lore);
-                    items[i].setItemMeta(meta);
+                    if (creativeItem) {
+                        items[i] = NBTItemData.set("LectronCreative", "CreativeItem", NBTItemData.get("LectronCreative", "CreativeItem", event.getContents().getIngredient()), items[i]);
+                    } else {
+                        items[i] = NBTItemData.set("LectronCreative", "SurvivalItem", NBTItemData.get("LectronCreative", "SurvivalItem", event.getContents().getIngredient()), items[i]);
+                    }
                 }
             }
             event.getContents().setContents(items);
@@ -190,12 +195,11 @@ public class InteractionListener implements Listener {
         if (disallowedWorlds.contains(event.getWhoClicked().getWorld().getName())) {
             return;
         }
-
-        event.setCursor(setCreativeItem(event.getWhoClicked().getName(), event.getCursor()));
-
+        if (!isSurvivalItem(event.getCursor())) {
+            event.setCursor(setCreativeItem(event.getWhoClicked().getName(), event.getCursor()));
+        }
         if (disallowedItems.contains(event.getCursor().getType())) {
             if (!event.getWhoClicked().hasPermission("limitcreative.useblacklistitems")) {
-
                 event.setCancelled(true);
                 if (event.getWhoClicked() instanceof Player) {
                     event.getWhoClicked().sendMessage(Messages.get().getMessage("ItemUsageNotAllowed"));
@@ -230,7 +234,7 @@ public class InteractionListener implements Listener {
 
     @EventHandler
     public void onEnchant(PrepareItemEnchantEvent event) {
-        if (this.isCreativeItem(event.getItem()) && event.getEnchanter().getGameMode() != GameMode.CREATIVE) {
+        if (isCreativeItem(event.getItem()) && event.getEnchanter().getGameMode() != GameMode.CREATIVE) {
             event.setCancelled(true);
         }
     }
@@ -241,26 +245,15 @@ public class InteractionListener implements Listener {
             return;
         }
         for (Block block : event.blockList()) {
-            if (StorageApi.isMarked(block)) {
-                String message = StorageApi.unmarkBlock(block);
-                for (ItemStack item : block.getDrops()) {
-                    setItemMetaData(message, item);
+            if (markedBlocks.containsKey(block)) {
+                String message = markedBlocks.remove(block);
+                block.getDrops().iterator().forEachRemaining(item -> {
+                    item = setCreativeItem(message, item);
                     block.getWorld().dropItemNaturally(block.getLocation().clone().add(0.5, 0, 0.5), item);
-                }
+                });
                 block.setType(Material.AIR);
             }
         }
-    }
-
-    private void setItemMetaData(String message, ItemStack item) {
-        ItemMeta meta = item.getItemMeta();
-        List<String> lore = new ArrayList<>();
-        if (meta.hasLore()) {
-            lore = meta.getLore();
-        }
-        lore.add(0, message);
-        meta.setLore(lore);
-        item.setItemMeta(meta);
     }
 
     @EventHandler
@@ -291,6 +284,10 @@ public class InteractionListener implements Listener {
             return;
         }
         if (checkEntity(event.getPlayer())) {
+            event.setCancelled(true);
+            return;
+        }
+        if (event.getPlayer().getItemInHand().getType().name().contains("EGG")) {
             event.setCancelled(true);
         }
     }
@@ -328,7 +325,7 @@ public class InteractionListener implements Listener {
             }
         }
         if (event.getWhoClicked().getGameMode() == GameMode.CREATIVE && event.getAction() == InventoryAction.CLONE_STACK
-                && !isCreativeItem(event.getCurrentItem())) {
+                && !isCreativeItem(event.getCurrentItem()) && !isSurvivalItem(event.getCurrentItem())) {
             ItemStack item = event.getCurrentItem();
             if (item != null && item.getType() != Material.AIR) {
                 item = setCreativeItem(event.getWhoClicked().getName(), event.getCurrentItem().clone());
@@ -391,6 +388,13 @@ public class InteractionListener implements Listener {
                 event.setCancelled(true);
             }
         }
+        if (!event.isCancelled()) {
+            if (player.getGameMode() == GameMode.CREATIVE) {
+                event.getItem().setItemStack(setCreativeItem(player.getName(), event.getItem().getItemStack()));
+            } else if (player.getGameMode() == GameMode.SURVIVAL) {
+                event.getItem().setItemStack(setSurvivalItem(player.getName(), event.getItem().getItemStack()));
+            }
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -399,7 +403,7 @@ public class InteractionListener implements Listener {
             return;
         }
         for (Block block : event.getBlocks()) {
-            if (StorageApi.isMarked(block)) {
+            if (markedBlocks.containsKey(block)) {
                 event.setCancelled(true);
                 return;
             }
@@ -413,9 +417,20 @@ public class InteractionListener implements Listener {
         }
         if (event.isSticky()) {
             Block block = event.getBlock().getRelative(event.getDirection()).getRelative(event.getDirection());
-            if (StorageApi.isMarked(block)) {
+            if (markedBlocks.containsKey(block)) {
                 event.setCancelled(true);
             }
+        }
+    }
+
+    @EventHandler
+    public void itemDrop(EntityDropItemEvent event) {
+        if (!(event.getEntity() instanceof Player)) {
+            return;
+        }
+        Player player = (Player) event.getEntity();
+        if (isCreativeItem(event.getItemDrop().getItemStack())) {
+            event.setCancelled(true);
         }
     }
 
@@ -429,18 +444,15 @@ public class InteractionListener implements Listener {
 
     private ItemStack setCreativeItem(String who, ItemStack item) {
         if (item != null && item.getType() != Material.AIR && item.getType() != Material.LEGACY_BOOK_AND_QUILL) {
-            if (!isCreativeItem(item)) {
-                ItemMeta meta = item.getItemMeta();
-                List<String> lore = new ArrayList<String>();
-                if (meta.hasLore()) {
-                    lore = meta.getLore();
-                }
-                lore.add(0, creativeMessage.replace("%Name%", who));
-                meta.setLore(lore);
-                item.setItemMeta(meta);
-            }
+            return NBTItemData.set("LectronCreative", "CreativeItem", who, item);
         }
         return item;
     }
 
+    private ItemStack setSurvivalItem(String who, ItemStack item) {
+        if (item != null && item.getType() != Material.AIR && item.getType() != Material.LEGACY_BOOK_AND_QUILL) {
+            return NBTItemData.set("LectronCreative", "SurvivalItem", who, item);
+        }
+        return item;
+    }
 }
