@@ -25,7 +25,7 @@ public class ClearCreativeCommand implements CommandExecutor {
             commandSender.sendMessage(ChatColor.RED + "Shove off console");
             return true;
         }
-        if (commandSender.hasPermission("limitcreative.clearcreative")) {
+        if (commandSender.hasPermission("lectroncreative.clearcreative")) {
             ItemStack item = ((Player) commandSender).getItemInHand();
             if (NBTItemData.getList("LectronCreative", item).contains("CreativeItem")) {
                 commandSender.sendMessage(Messages.get().getMessage("NoCreativeMessageFound"));
