@@ -11,9 +11,9 @@ public class Main extends JavaPlugin {
         new Options(this);
         new Messages(this);
 
-        new InteractionListener(this);
+        InteractionListener interactionListener = new InteractionListener(this);
 
-        this.getCommand("clearcreative").setExecutor(new ClearCreativeCommand(this));
+        this.getCommand("clearcreative").setExecutor(new ClearCreativeCommand(this, interactionListener));
     }
 
 }

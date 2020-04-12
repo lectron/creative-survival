@@ -27,6 +27,9 @@ PreventTransfer: true
 # Does it prevent creative items being dropped?
 PreventDrop: false
 
+# Should the plugin add the lore to identify a creative item?
+AddCreativeLore: true
+
 # What worlds are disabled for this.
 # It means this plugin will ignore that world.
 # Items carried over from that world WILL be usable.

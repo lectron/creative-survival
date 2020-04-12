@@ -1,6 +1,7 @@
 package me.sky.creativesurvival.commands;
 
 import me.sky.creativesurvival.Main;
+import me.sky.creativesurvival.base.InteractionListener;
 import me.sky.creativesurvival.utils.Messages;
 import me.sky.creativesurvival.utils.nbt.NBTItemData;
 import org.bukkit.ChatColor;
@@ -13,10 +14,12 @@ import org.bukkit.inventory.ItemStack;
 
 public class ClearCreativeCommand implements CommandExecutor {
 
-    private Main plugin;
+    private final Main plugin;
+    private final InteractionListener interactionListener;
 
-    public ClearCreativeCommand(Main plugin) {
+    public ClearCreativeCommand(Main plugin, InteractionListener interactionListener) {
         this.plugin = plugin;
+        this.interactionListener = interactionListener;
     }
 
     @Override
@@ -35,7 +38,12 @@ public class ClearCreativeCommand implements CommandExecutor {
                 commandSender.sendMessage(Messages.get().getMessage("NoCreativeMessageFound"));
                 return false;
             }
-            ((Player) commandSender).setItemInHand(NBTItemData.remove("CreativeSurvival", "CreativeItem", item));
+            if (NBTItemData.getList("CreativeSurvival", item).contains("CreativeLoreIndex")) {
+                item = interactionListener.removeCreativeLore(item);
+                item = NBTItemData.remove("CreativeSurvival", "CreativeLoreIndex", item);
+            }
+            item = NBTItemData.remove("CreativeSurvival", "CreativeItem", item);
+            ((Player) commandSender).setItemInHand(item);
             commandSender.sendMessage(Messages.get().getMessage("RemovedCreativeMessage"));
         } else
             commandSender.sendMessage(Messages.get().getMessage("NoPermission"));

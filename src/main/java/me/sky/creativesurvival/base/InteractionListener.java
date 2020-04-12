@@ -30,6 +30,7 @@ import org.bukkit.event.inventory.*;
 import org.bukkit.event.player.*;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
@@ -61,12 +62,28 @@ public class InteractionListener implements Listener {
             try {
                 disallowedItems.add(Material.getMaterial(disallowed.toUpperCase()));
             } catch (Exception ex) {
-//                try {
-//                    disallowedItems.add(Material.getMaterial(Integer.parseInt(disallowed)));
-//                } catch (Exception e) {
-//                }
                 System.out.print("[CreativeSurvival] Cannot parse " + disallowed + " to a valid material");
             }
+        }
+
+        if (getConfig().getBoolean("PreventArmor")) {
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    Bukkit.getOnlinePlayers().forEach(player -> {
+                        ItemStack[] items = player.getInventory().getArmorContents();
+                        for (int i = 0; i < items.length; i++) {
+                            ItemStack item = items[i];
+                            if (item != null) {
+                                if (isCreativeItem(item) && !isSurvivalItem(item)) {
+                                    items[i] = null;
+                                }
+                            }
+                        }
+                        player.getInventory().setArmorContents(items);
+                    });
+                }
+            }.runTaskTimerAsynchronously(plugin, 0, 20);
         }
     }
 
@@ -277,6 +294,15 @@ public class InteractionListener implements Listener {
         if (disallowedWorlds.contains(event.getPlayer().getWorld().getName())) {
             return;
         }
+        if (event.getPlayer().getGameMode() != GameMode.CREATIVE
+                && event.getNewGameMode() == GameMode.CREATIVE) {
+            for (int i = 0; i < event.getPlayer().getInventory().getSize(); i++) {
+                ItemStack item = event.getPlayer().getInventory().getItem(i);
+                if (item != null && !isCreativeItem(item) && !isSurvivalItem(item)) {
+                    event.getPlayer().getInventory().setItem(i, setSurvivalItem(event.getPlayer().getName(), item));
+                }
+            }
+        }
         if (getConfig().getBoolean("PreventArmor") && event.getPlayer().getGameMode() == GameMode.CREATIVE
                 && event.getNewGameMode() != GameMode.CREATIVE) {
             ItemStack[] items = event.getPlayer().getInventory().getArmorContents();
@@ -466,7 +492,7 @@ public class InteractionListener implements Listener {
     public void itemDrop(PlayerDropItemEvent event) {
         Player player = event.getPlayer();
         if (player.getGameMode() == GameMode.CREATIVE && isCreativeItem(event.getItemDrop().getItemStack())) {
-            event.setCancelled(true);
+            event.getItemDrop().remove();
         }
     }
 
@@ -480,7 +506,34 @@ public class InteractionListener implements Listener {
 
     private ItemStack setCreativeItem(String who, ItemStack item) {
         if (item != null && item.getType() != Material.AIR) {
+            if (getConfig().getBoolean("AddCreativeLore")) {
+                ItemMeta meta = item.getItemMeta();
+                List<String> lore = meta.hasLore() ? new ArrayList<>(meta.getLore()) : new ArrayList<>();
+                lore.add("");
+                lore.add(Messages.get().getMessage("CreativeLore").replace("%player%", who));
+                meta.setLore(lore);
+                item.setItemMeta(meta);
+                item = NBTItemData.set("CreativeSurvival", "CreativeLoreIndex", String.valueOf(lore.size() - 1), item);
+            }
             return NBTItemData.set("CreativeSurvival", "CreativeItem", who, item);
+        }
+        return item;
+    }
+
+    public ItemStack removeCreativeLore(ItemStack item) {
+        if (item != null && item.getType() != Material.AIR) {
+            ItemMeta meta = item.getItemMeta();
+            if (meta.hasLore()) {
+                String ind = NBTItemData.get("CreativeSurvival", "CreativeLoreIndex", item);
+                if (!StringUtils.isNullOrEmpty(ind)) {
+                    int index = Integer.parseInt(ind);
+                    List<String> lore = meta.getLore();
+                    lore.remove(index - 1);
+                    lore.remove(index - 1);
+                    meta.setLore(lore);
+                    item.setItemMeta(meta);
+                }
+            }
         }
         return item;
     }
