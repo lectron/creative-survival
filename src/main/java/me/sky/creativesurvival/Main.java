@@ -13,7 +13,7 @@ public class Main extends JavaPlugin {
 
         InteractionListener interactionListener = new InteractionListener(this);
 
-        this.getCommand("clearcreative").setExecutor(new ClearCreativeCommand(this, interactionListener));
+        this.getCommand("clearlore").setExecutor(new ClearCreativeCommand(this, interactionListener));
     }
 
 }
