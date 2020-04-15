@@ -28,7 +28,7 @@ public class ClearCreativeCommand implements CommandExecutor {
             commandSender.sendMessage(ChatColor.RED + "Shove off console");
             return true;
         }
-        if (commandSender.hasPermission("creativesurvival.clearcreative")) {
+        if (commandSender.hasPermission("creativesurvival.clearlore")) {
             ItemStack item = ((Player) commandSender).getItemInHand();
             if (item.getType() == Material.AIR) {
                 commandSender.sendMessage(Messages.get().getMessage("NotHoldingItem"));

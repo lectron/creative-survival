@@ -25,7 +25,7 @@ MarkBlocks: true
 # Does it prevent creative items being transefered into another inventory?
 PreventTransfer: true
 # Does it prevent creative items being dropped?
-PreventDrop: false
+PreventDrop: true
 
 # Should the plugin add the lore to identify a creative item?
 AddCreativeLore: true

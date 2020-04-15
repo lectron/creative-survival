@@ -7,6 +7,7 @@ import me.sky.creativesurvival.utils.Messages;
 import me.sky.creativesurvival.utils.Options;
 import me.sky.creativesurvival.utils.nbt.NBTItemData;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -303,6 +304,15 @@ public class InteractionListener implements Listener {
                 }
             }
         }
+        if (event.getPlayer().getGameMode() == GameMode.CREATIVE
+                && event.getNewGameMode() != GameMode.CREATIVE) {
+            for (int i = 0; i < event.getPlayer().getInventory().getSize(); i++) {
+                ItemStack item = event.getPlayer().getInventory().getItem(i);
+                if (item != null && isCreativeItem(item)) {
+                    event.getPlayer().getInventory().setItem(i, null);
+                }
+            }
+        }
         if (getConfig().getBoolean("PreventArmor") && event.getPlayer().getGameMode() == GameMode.CREATIVE
                 && event.getNewGameMode() != GameMode.CREATIVE) {
             ItemStack[] items = event.getPlayer().getInventory().getArmorContents();
@@ -491,7 +501,7 @@ public class InteractionListener implements Listener {
     @EventHandler
     public void itemDrop(PlayerDropItemEvent event) {
         Player player = event.getPlayer();
-        if (player.getGameMode() == GameMode.CREATIVE && isCreativeItem(event.getItemDrop().getItemStack())) {
+        if (getConfig().getBoolean("PreventDrop") && player.getGameMode() == GameMode.CREATIVE && isCreativeItem(event.getItemDrop().getItemStack())) {
             event.getItemDrop().remove();
         }
     }
@@ -505,8 +515,8 @@ public class InteractionListener implements Listener {
     }
 
     private ItemStack setCreativeItem(String who, ItemStack item) {
-        if (item != null && item.getType() != Material.AIR) {
-            if (getConfig().getBoolean("AddCreativeLore")) {
+        if (item != null && item.getType() != Material.AIR && !isSurvivalItem(item)) {
+            if (getConfig().getBoolean("AddCreativeLore") && !NBTItemData.getList("CreativeSurvival", item).contains("CreativeLoreIndex")) {
                 ItemMeta meta = item.getItemMeta();
                 List<String> lore = meta.hasLore() ? new ArrayList<>(meta.getLore()) : new ArrayList<>();
                 lore.add("");
